@@ -107,8 +107,8 @@ GymPilot-AI/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/gympilot-ai.git
-cd gympilot-ai
+git clone https://github.com/miteshkumrawat441-design/GymPilot-AI.git
+cd GymPilot-AI
 ```
 
 ### 2. Create and activate a virtual environment
