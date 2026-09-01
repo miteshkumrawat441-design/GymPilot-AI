@@ -20,7 +20,7 @@ from services.coaching.voice_pipeline import VoicePipeline, autoplay_audio
 def main():
     st.set_page_config(
         page_icon="🏋️‍♀️",
-        page_title="AI Real-time GYM Coach",
+        page_title="GymPilot AI",
         initial_sidebar_state="expanded",
         layout="centered"
     )
@@ -52,7 +52,7 @@ def main():
     workout_started = st.session_state.get("workout_started", False)
     
     with st.sidebar:
-        st.title("🏋️‍♂️ Apna AI Coach")
+        st.title("AI Coach")
 
         if st.session_state.username:
             st.caption(f"👤 Login as {st.session_state.username}")
@@ -165,7 +165,7 @@ def main():
                 st.metric("Torso Angle", f"{st.session_state.torso_angle}°")
                 st.metric("Balance Status", st.session_state.balance_status)
 
-    st.title("AI Real-time GYM Coach")
+    st.title("GymPilot AI")
     st.markdown("#### Real-time pose detection with proactive AI voice coaching")
  
     if st.session_state.get("audio_to_play"):
