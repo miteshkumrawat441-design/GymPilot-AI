@@ -27,9 +27,9 @@ class VideoProcessorClass(VideoProcessorBase):
         options = vision.PoseLandmarkerOptions(
             base_options=base_option,
             running_mode=vision.RunningMode.VIDEO,
-            min_pose_detection_confidence=0.7,
-            min_pose_presence_confidence=0.7,
-            min_tracking_confidence=0.7,
+            min_pose_detection_confidence=0.5,
+            min_pose_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
             output_segmentation_masks=False
         )
 
@@ -60,133 +60,190 @@ class VideoProcessorClass(VideoProcessorBase):
     def get_exercise(self):
         with self._lock:
             return self._exercise_type
+
+    def _draw_joint_angle_badge(self, img, x, y, angle_val, label=""):
+        h, w = img.shape[:2]
+        px = max(50, min(w - 70, int(x)))
+        py = max(35, min(h - 30, int(y)))
+        
+        text = f"{int(angle_val)}°" if label == "" else f"{label} {int(angle_val)}°"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        thickness = 2
+        (tw, th), _ = cv2.getTextSize(text, font, font_scale, thickness)
+
+        # Draw dark background badge
+        cv2.rectangle(
+            img,
+            (px - 6, py - th - 6),
+            (px + tw + 6, py + 6),
+            (10, 15, 25),
+            -1
+        )
+        # Green border
+        cv2.rectangle(
+            img,
+            (px - 6, py - th - 6),
+            (px + tw + 6, py + 6),
+            (34, 197, 94),
+            1
+        )
+        # Green text
+        cv2.putText(
+            img,
+            text,
+            (px, py),
+            font,
+            font_scale,
+            (74, 222, 128),
+            thickness,
+            cv2.LINE_AA
+        )
         
     def _draw_skeleton(self, img, landmarks):
         h, w = img.shape[:2]
 
+        # Draw connecting skeleton lines
         for start_idx, end_idx in POSE_CONNECTIONS:
-            p1 = landmarks[start_idx]
-            p2 = landmarks[end_idx]
+            if start_idx < len(landmarks) and end_idx < len(landmarks):
+                p1 = landmarks[start_idx]
+                p2 = landmarks[end_idx]
 
-            if p1.visibility > 0.7 and p2.visibility > 0.7:
-                cv2.line(
-                    img,
-                    (int(p1.x * w), int(p1.y * h)),
-                    (int(p2.x * w), int(p2.y * h)),
-                    (0, 255, 0),
-                    8
-                )
+                v1 = getattr(p1, 'visibility', 1.0)
+                v2 = getattr(p2, 'visibility', 1.0)
+                v1 = 1.0 if v1 is None else v1
+                v2 = 1.0 if v2 is None else v2
+
+                if v1 > 0.35 and v2 > 0.35:
+                    cv2.line(
+                        img,
+                        (int(p1.x * w), int(p1.y * h)),
+                        (int(p2.x * w), int(p2.y * h)),
+                        (34, 197, 94),  # Athletic Green
+                        3,
+                        cv2.LINE_AA
+                    )
         
+        # Draw joint dots
         for lm in landmarks:
-            if lm.visibility > 0.7:
-                cv2.circle(
-                    img, 
-                    (int(lm.x * w), int(lm.y * h)),
-                    8,
-                    (255, 0, 0),
-                    -1
-                )
+            v = getattr(lm, 'visibility', 1.0)
+            v = 1.0 if v is None else v
+            if v > 0.35:
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                # Outer white circle
+                cv2.circle(img, (cx, cy), 7, (255, 255, 255), 1, cv2.LINE_AA)
+                # Inner green dot
+                cv2.circle(img, (cx, cy), 5, (74, 222, 128), -1, cv2.LINE_AA)
+
+    def _draw_joint_angles(self, img, landmarks, metrics, ex_type):
+        h, w = img.shape[:2]
+
+        if ex_type == "Squats":
+            # Knee Angle badge at the knee joint
+            knee_angle = metrics.get("knee_angle", 0)
+            # Pick left or right knee (index 25 or 26)
+            l_knee = landmarks[25]
+            r_knee = landmarks[26]
+            knee = l_knee if (getattr(l_knee, 'visibility', 1.0) or 0) >= (getattr(r_knee, 'visibility', 1.0) or 0) else r_knee
+            if knee:
+                self._draw_joint_angle_badge(img, knee.x * w + 15, knee.y * h, knee_angle, "KNEE")
+
+            # Back angle badge at hip
+            back_angle = metrics.get("back_angle", 0)
+            l_hip = landmarks[23]
+            r_hip = landmarks[24]
+            hip = l_hip if (getattr(l_hip, 'visibility', 1.0) or 0) >= (getattr(r_hip, 'visibility', 1.0) or 0) else r_hip
+            if hip:
+                self._draw_joint_angle_badge(img, hip.x * w + 15, hip.y * h, back_angle, "BACK")
+
+        elif ex_type in ["Push-ups", "Biceps Curls (Dumbbell)", "Shoulder Press"]:
+            # Elbow angle badge
+            elbow_angle = metrics.get("elbow_angle", 0)
+            l_elbow = landmarks[13]
+            r_elbow = landmarks[14]
+            elbow = l_elbow if (getattr(l_elbow, 'visibility', 1.0) or 0) >= (getattr(r_elbow, 'visibility', 1.0) or 0) else r_elbow
+            if elbow:
+                self._draw_joint_angle_badge(img, elbow.x * w + 15, elbow.y * h, elbow_angle, "ELBOW")
+
+        elif ex_type == "Lunges":
+            front_knee_angle = metrics.get("front_knee_angle", 0)
+            l_knee = landmarks[25]
+            r_knee = landmarks[26]
+            knee = l_knee if (getattr(l_knee, 'visibility', 1.0) or 0) >= (getattr(r_knee, 'visibility', 1.0) or 0) else r_knee
+            if knee:
+                self._draw_joint_angle_badge(img, knee.x * w + 15, knee.y * h, front_knee_angle, "KNEE")
             
     def _draw_no_pose_warnings(self, img):
+        h, w = img.shape[:2]
+        # Dark banner
+        cv2.rectangle(img, (20, 20), (320, 90), (10, 15, 25), -1)
+        cv2.rectangle(img, (20, 20), (320, 90), (0, 0, 255), 2)
         cv2.putText(
             img,
             "NO POSE DETECTED",
-            (30, 50),
+            (35, 52),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
+            0.7,
+            (0, 100, 255),
             2,
             cv2.LINE_AA,
         )
-
         cv2.putText(
             img,
-            "PLEASE FACE THE CAMERA",
-            (30, 100),
+            "STEP INTO CAMERA FRAME",
+            (35, 78),
             cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
             1,
-            (0, 255, 0),
-            2,
             cv2.LINE_AA,
         )
 
     def _draw_overlays(self, img, metrics, ex_type):
+        h, w = img.shape[:2]
+
+        # Top HUD Bar: Exercise Name & Reps
+        reps = metrics.get("reps", 0)
+        top_bar_text = f"{ex_type.upper()} | REPS: {reps}"
+        cv2.rectangle(img, (15, 15), (min(w - 15, 340), 55), (10, 15, 25), -1)
+        cv2.rectangle(img, (15, 15), (min(w - 15, 340), 55), (34, 197, 94), 1)
+        cv2.putText(
+            img,
+            top_bar_text,
+            (25, 42),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.68,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA
+        )
+
+        # Bottom HUD Bar: Form status
+        status_text = ""
         if ex_type == "Squats":
-            self._draw_squats_overlays(img, metrics)
+            status_text = f"DEPTH: {metrics.get('depth_status', 'N/A')}"
         elif ex_type == "Push-ups":
-            self._draw_pushup_overlays(img, metrics)
+            status_text = f"BODY: {metrics.get('body_alignment', 'N/A')} | HIP: {metrics.get('hip_status', 'N/A')}"
         elif ex_type == "Biceps Curls (Dumbbell)":
-            self._draw_curl_overlays(img, metrics)
+            status_text = f"SWING: {metrics.get('swing_status', 'N/A')} | SHOULDER: {metrics.get('shoulder_status', 'N/A')}"
         elif ex_type == "Shoulder Press":
-            self._draw_press_overlays(img, metrics)
+            status_text = f"EXT: {metrics.get('extension_status', 'N/A')} | ARCH: {metrics.get('back_arch_status', 'N/A')}"
         elif ex_type == "Lunges":
-            self._draw_lunge_overlays(img, metrics)
+            status_text = f"BALANCE: {metrics.get('balance_status', 'N/A')}"
 
-
-    def _draw_squats_overlays(self, img, metrics):
-        h, _ = img.shape[:2]
-
-        cv2.putText(
-            img,
-            f"DEPTH: {metrics['depth_status']}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
-    
-    def _draw_pushup_overlays(self, img, metrics):
-        h, _ = img.shape[:2]
-
-        cv2.putText(
-            img,
-            f"BODY: {metrics['body_alignment']} | HIP: {metrics['hip_status']}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
-
-    def _draw_curl_overlays(self, img, metrics):
-        h, _ = img.shape[:2]
-
-        cv2.putText(
-            img,
-            f"SWING: {metrics['swing_status']}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
-
-    def _draw_press_overlays(self, img, metrics):
-        h, _ = img.shape[:2]
-
-        cv2.putText(
-            img,
-            f"EXT: {metrics['extension_status']} | BACK: {metrics['back_arch_status']}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
-
-    def _draw_lunge_overlays(self, img, metrics):
-        h, _ = img.shape[:2]
-
-        cv2.putText(
-            img,
-            f"BALANCE: {metrics['balance_status']}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
+        if status_text:
+            cv2.rectangle(img, (15, h - 50), (min(w - 15, 460), h - 15), (10, 15, 25), -1)
+            cv2.rectangle(img, (15, h - 50), (min(w - 15, 460), h - 15), (34, 197, 94), 1)
+            cv2.putText(
+                img,
+                status_text,
+                (25, h - 26),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (74, 222, 128),
+                2,
+                cv2.LINE_AA
+            )
 
     def recv(self, frame):
         image = np.asarray(
@@ -194,28 +251,32 @@ class VideoProcessorClass(VideoProcessorBase):
             dtype=np.uint8
         )
 
+        # Convert correctly from BGR to RGB for MediaPipe
         mp_image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
-            data=cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         )
 
-        self._frame_timestamps_ms += 30
+        self._frame_timestamps_ms += 33
         result = self._landmarker.detect_for_video(mp_image, self._frame_timestamps_ms)
 
         if result.pose_landmarks:
             landmarks = result.pose_landmarks[0]
 
+            # 1. Draw joint dots and skeleton lines
             self._draw_skeleton(image, landmarks)
 
             ex_type = self.get_exercise()
-
             detector = self._detectors.get(ex_type)
 
             if detector:
                 metrics = detector.process(landmarks)
-
                 metrics["pose_detected"] = True
 
+                # 2. Draw live angles directly on active joints
+                self._draw_joint_angles(image, landmarks, metrics, ex_type)
+
+                # 3. Draw top & bottom HUD overlays
                 self._draw_overlays(image, metrics, ex_type)
 
                 self.set_latest_metrics(metrics)
@@ -229,4 +290,3 @@ class VideoProcessorClass(VideoProcessorBase):
                     self._latest_metrics = {"pose_detected": False}
 
         return av.VideoFrame.from_ndarray(image, format="bgr24")
-    

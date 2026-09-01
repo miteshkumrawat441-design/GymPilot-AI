@@ -2,6 +2,10 @@ import streamlit as st
 import os
 import time
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from services.auth.login_wall import render_login_wall
 from services.state.session_defaults import initial_session_defaults
 from services.config.workout_config import EXERCISE_OPTIONS
@@ -22,7 +26,7 @@ def main():
         page_icon="🏋️‍♀️",
         page_title="GymPilot AI",
         initial_sidebar_state="expanded",
-        layout="centered"
+        layout="wide"
     )
 
     load_css(os.path.join(os.getcwd(), "static", "style.css"))
@@ -52,25 +56,25 @@ def main():
     workout_started = st.session_state.get("workout_started", False)
     
     with st.sidebar:
-        st.title("AI Coach")
+        st.title("🤖 AI Coach")
 
         if st.session_state.username:
             st.caption(f"👤 Login as {st.session_state.username}")
 
         st.divider()
 
-        st.subheader("Workout Plan")
+        st.subheader("📋 Workout Plan")
 
         if not workout_started:
-            plan_exercise = st.selectbox("Exercise", options=EXERCISE_OPTIONS, key="plan_exercise")
+            plan_exercise = st.selectbox("🏋️ Exercise", options=EXERCISE_OPTIONS, key="plan_exercise")
 
-            plan_sets = st.number_input("Sets", min_value=0, max_value=50, key="plan_sets", step=1)
+            plan_sets = st.number_input("🔁 Sets", min_value=0, max_value=50, key="plan_sets", step=1)
 
-            plan_reps = st.number_input("Reps per Set", min_value=0, max_value=50, key="plan_reps", step=1)
+            plan_reps = st.number_input("🎯 Reps per Set", min_value=0, max_value=50, key="plan_reps", step=1)
 
             st.markdown("")
 
-            start_session_button = st.button("Start Workout", width="stretch", key="start_session_button")
+            start_session_button = st.button("▶ Start Workout", width="stretch", key="start_session_button")
 
             if start_session_button:
                 st.session_state.exercise_type = plan_exercise
@@ -101,7 +105,7 @@ def main():
 
             st.info(f"**{exercise}** -- {sets} Sets / {reps} Reps")
 
-            end_session_button = st.button("End Workout", key="end_session_button", width="stretch")
+            end_session_button = st.button("⏹ End Workout", key="end_session_button", width="stretch")
 
             if end_session_button:
                 st.session_state.workout_started = False
@@ -127,7 +131,7 @@ def main():
             sets_completed = st.session_state.get("sets_completed")
             target_sets = st.session_state.get("target_sets")
 
-            st.subheader("Progress")
+            st.subheader("📊 Progress")
 
             st.metric("Total Reps", f"{total_reps}")
             st.metric("Current Set Reps", f"{current_set_reps} / {reps_per_set}")
@@ -165,8 +169,8 @@ def main():
                 st.metric("Torso Angle", f"{st.session_state.torso_angle}°")
                 st.metric("Balance Status", st.session_state.balance_status)
 
-    st.title("GymPilot AI")
-    st.markdown("#### Real-time pose detection with proactive AI voice coaching")
+    st.title("🏋️‍♂️ GymPilot AI")
+    st.markdown("#### 🎯 Real-time pose detection with proactive AI voice coaching")
  
     if st.session_state.get("audio_to_play"):
         autoplay_audio(st.session_state.audio_to_play)
@@ -179,18 +183,20 @@ def main():
         st.markdown(
             """
             <div style="
-                border: 10px dashed #444;
-                border-radius: 0px;
-                padding: 48px 32px;
+                border: 2px dashed rgba(255,255,255,0.15);
+                border-radius: 12px;
+                padding: 40px 28px;
                 text-align: center;
-                color: #888;
-                margin-top: 32px;
-                margin-bottom: 32px;
+                color: #94A3B8;
+                background: #111520;
+                margin-top: 24px;
+                margin-bottom: 24px;
             ">
-                <h2 style="color:#ccc; margin-bottom:8px;">👈 Set your workout plan</h2>
-                <p style="font-size:1.05rem;">
+                <div style="font-size: 2.2rem; margin-bottom: 12px;">📷 🧘</div>
+                <h3 style="color:#FFFFFF; margin-bottom:8px; font-weight: 700;">Set your workout plan</h3>
+                <p style="font-size:1rem; line-height: 1.5; color: #94A3B8;">
                     Choose your exercise, sets and reps in the sidebar,<br>
-                    then click <strong>Start Workout</strong> to activate the camera and AI coach.
+                    then click <strong>▶ Start Workout</strong> to activate the camera and AI coach.
                 </p>
             </div>
             """,
@@ -209,6 +215,9 @@ def main():
             async_processing=True
         )
 
+        if context.video_processor:
+            context.video_processor.set_exercise(st.session_state.get("exercise_type", "Squats"))
+
         sync_metrics_update(context)
 
         if context.state.playing:
@@ -219,7 +228,7 @@ def main():
 
     st.divider()
 
-    st.markdown("#### Workout History")
+    st.subheader("🕒 Workout History")
 
     user_id = st.session_state.get("user_id", 0)
 
@@ -254,4 +263,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

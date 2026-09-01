@@ -4,7 +4,7 @@ from core.base_exercise import BaseExercise
 class SquatDetector(BaseExercise):
     DOWN_THRESHOLD = 100   
     UP_THRESHOLD = 160     
-    MIN_VISIBILITY = 0.7
+    MIN_VISIBILITY = 0.4
 
     LEFT_HIP = 23
     LEFT_KNEE = 25
