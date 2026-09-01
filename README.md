@@ -62,7 +62,7 @@ flowchart TD
 ## 📁 Project Structure
 
 ```text
-AI_GYM_Couch/
+GymPilot-AI/
 ├── core/
 │   └── base_exercise.py          # Base class for angle math and landmark helpers
 ├── detectors/
