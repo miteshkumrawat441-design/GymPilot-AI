@@ -6,6 +6,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import sys
+import subprocess
+
+# --- PATCH FOR STREAMLIT CLOUD OPENCV CONFLICT ---
+# MediaPipe installs opencv-python by default, which crashes on Streamlit Cloud due to missing libglib2.0-0.
+# This forces the app to use opencv-python-headless instead.
+if os.environ.get("STREAMLIT_SERVER_PORT") is not None:
+    try:
+        import cv2
+    except ImportError:
+        print("🔧 Streamlit Cloud detected: Fixing OpenCV headless conflict...")
+        subprocess.check_call([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python", "opencv-contrib-python"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "opencv-python-headless==4.8.0.74"])
+
 from services.auth.login_wall import render_login_wall
 from services.state.session_defaults import initial_session_defaults
 from services.config.workout_config import EXERCISE_OPTIONS
